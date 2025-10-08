@@ -1,30 +1,52 @@
 package com.example.demo;
+import com.hazelcast.core.*;
+import com.hazelcast.config.Config;
+import com.hazelcast.cp.lock.FencedLock;
 
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.cp.IAtomicLong;
+import java.util.ArrayList;
+import java.util.List;
 
-@SpringBootApplication
 public class DemoApplication {
+    public static void main(String[] args) throws InterruptedException {
+        int numeroDeNos = 3;
+        List<HazelcastInstance> cluster = new ArrayList<>();
 
-private static final String LOCK_NAME = "leader-lock";
-public static void main(String[] args) {
-        HazelcastInstance hazelcast = Hazelcast.newHazelcastInstance();
-
-        
-        IAtomicLong leaderCounter = hazelcast.getCPSubsystem().getAtomicLong("leader");
-
-        long value = leaderCounter.incrementAndGet();
-
-        if (value == 1) {
-            System.out.println("Este nó é o líder.");
-            
-        } else {
-            System.out.println("Este nó é um seguidor.");
+        for (int i = 0; i < numeroDeNos; i++) {
+            HazelcastInstance instance = Hazelcast.newHazelcastInstance(new Config());
+            cluster.add(instance);
         }
 
-        System.exit(0);
-    }
+        for (int i = 0; i < cluster.size(); i++) {
+            final int nodeId = i;
+            HazelcastInstance node = cluster.get(i);
 
+            new Thread(() -> {
+                FencedLock lock = node.getCPSubsystem().getLock("leader-lock");
+
+                if (lock.tryLock()) {
+                    System.out.println("Nó " + nodeId + " foi eleito como LÍDER.");
+                    try {
+                        while (true) {
+                            System.out.println("Nó " + nodeId + " mantendo liderança...");
+                            Thread.sleep(3000);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        lock.unlock();
+                    }
+                } else {
+                    System.out.println("Nó " + nodeId + " é SEGUIDOR.");
+                    try {
+                        while (true) {
+                            System.out.println("Nó " + nodeId + " aguardando liderança...");
+                            Thread.sleep(5000);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }).start();
+        }
+    }
 }

@@ -21,3 +21,4 @@ docker compose up -d --scale hazelcast=2 = sobe os containers </br>
 
 - Porta de acesso ao menagement center: http://localhost:8081/ </br>
 - Porta de acesso a aplicação http://localhost:8080/teste-api/safar/</br>
+- Script de execução dos testes: k6 run --summary-export=resultado.json teste.js
